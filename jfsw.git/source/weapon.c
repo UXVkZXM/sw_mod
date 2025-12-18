@@ -15760,6 +15760,102 @@ InitRocket(PLAYERp pp)
 
 int
 InitBunnyRocket(PLAYERp pp)
+	{
+    USERp u = User[pp->PlayerSprite];
+    USERp wu;
+    SPRITEp wp;
+    long nx, ny, nz;
+    short w, hitsprite;
+    short oclipdist;
+    long zvel;
+
+	PlayerUpdateAmmo(pp, u->WeaponNum, -1);
+
+    DoPlayerBeginRecoil(pp, ROCKET_RECOIL_AMT*12);
+
+    PlaySound(DIGI_RIOTFIRE, &pp->posx, &pp->posy, &pp->posz, v3df_dontpan|v3df_doppler);
+
+    // Make sprite shade brighter
+    u->Vis = 128;
+
+    nx = pp->posx;
+    ny = pp->posy;
+
+    // Spawn a shot
+    // Inserting and setting up variables
+    //nz = pp->posz + pp->bob_z + Z(12);
+    nz = pp->posz + pp->bob_z + Z(8);
+    w = SpawnSprite(STAT_MISSILE, BOLT_THINMAN_R0, &s_Rocket[0][0], pp->cursectnum,
+        nx, ny, nz, pp->pang, 700);
+
+    wp = &sprite[w];
+    wu = User[w];
+
+    //wp->owner = pp->PlayerSprite;
+    SetOwner(pp->PlayerSprite, w);
+    wp->yrepeat = 128;
+    wp->xrepeat = 128;
+    wp->shade = -15;
+    zvel = ((100 - pp->horiz) * (HORIZ_MULT-36));
+    wp->clipdist = 64L>>2;
+
+    // Set to red palette
+    wp->pal = wu->spal = 19;
+
+    wu->RotNum = 5;
+    NewStateGroup(w, &sg_Rocket[0]);
+
+    wu->WeaponNum = u->WeaponNum;
+    wu->Radius = NUKE_RADIUS;
+    wu->ceiling_dist = Z(3);
+    wu->floor_dist = Z(3);
+    SET(wp->cstat, CSTAT_SPRITE_YCENTER);
+    SET(wp->cstat, CSTAT_SPRITE_BLOCK|CSTAT_SPRITE_BLOCK_HITSCAN);
+
+    // at certain angles the clipping box was big enough to block the
+    // initial positioning of the fireball.
+    oclipdist = pp->SpriteP->clipdist;
+    pp->SpriteP->clipdist = 0;
+
+    wp->ang = NORM_ANGLE(wp->ang + 512);
+    HelpMissileLateral(w, 900);
+    wp->ang = NORM_ANGLE(wp->ang - 512);
+
+    if (TEST(pp->Flags, PF_DIVING) || SpriteInUnderwaterArea(wp))
+        SET(wu->Flags, SPR_UNDERWATER);
+
+    // cancel smoke trail
+    wu->Counter = 1;
+    if (TestMissileSetPos(w, DoRocket, 1200, zvel))
+        {
+        pp->SpriteP->clipdist = oclipdist;
+        KillSprite(w);
+        return(0);
+        }
+    // inable smoke trail
+    wu->Counter = 0;
+
+    pp->SpriteP->clipdist = oclipdist;
+
+    wp->zvel = zvel >> 1;
+    if (WeaponAutoAim(pp->SpriteP, w, 32, FALSE) == -1)
+        {
+        wp->ang = NORM_ANGLE(wp->ang - 5);
+#if MEGAWANG
+        zvel *= xfov;
+#endif
+        } else
+        zvel = wp->zvel;  // Let autoaiming set zvel now
+
+    wu->xchange = MOVEx(wp->xvel, wp->ang);
+    wu->ychange = MOVEy(wp->xvel, wp->ang);
+    wu->zchange = zvel;
+
+    PlayerDamageSlide(pp, -40, NORM_ANGLE(pp->pang+1024)); // Recoil slide
+
+    return (0);
+    }
+/*
     {
     USERp u = User[pp->PlayerSprite];
     USERp wu;
@@ -15873,8 +15969,8 @@ InitBunnyRocket(PLAYERp pp)
     wu->spal = wp->pal = PALETTE_PLAYER1;
 
     return (0);
-    }
-
+    } */
+		
 int
 InitNuke(PLAYERp pp)
     {
